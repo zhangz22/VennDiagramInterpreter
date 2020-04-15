@@ -16,7 +16,8 @@ class ExpressionSet(object):
         self.relations = set()   # A set of Expression objects
         self.members = set()     # A set of strings representing members (A,B,C...)
         self.label_id = {}       # A set of all labels in the diagram (A,B,AB...)
-        self.highlight = {}      # A dictionary containing area code -> list of expressions
+        self.possible = {}      # A dictionary containing area code -> list of expressions that is emphasized by "Some" statements
+        self.definite = {}      # A dictionary containing area code -> list of expressions that is emphasized by "All" statements
         self.disable = {}
         self.diagram = None     # The venn diagram objects
 
@@ -52,37 +53,52 @@ class ExpressionSet(object):
             raise TypeError("ERROR: Unknown type inserted.")
         if len(self.members) > 3:
             print(self.members, file=sys.stderr)
-            raise ValueError("ERROR: Only two or three sets can be supported but the program got " + str(self.members))
+            raise ValueError("ERROR: Only two or three sets can be supported but "
+                             "the program got " + str(self.members))
 
     def parse(self, exp: Expression):
-        # expression_area:
-        #    Some A is B: find if there is some area AB -> true
-        #    All A is B:  find if there is some area A (without B) -> false
-        #    Some A is not B: find if there is some area A (without B) -> true
-        #    All A is not B:  find if there is some area AB -> false
-        prove = set()
-        refute = set()
+        """
+        This function evaluates the validity of a single expression and returns two sets
+        containing the area labels to prove/disprove the statement
+        :param exp:
+        :return: support: a set contains all area labels that can prove this statement
+                 against: a set contains all area labels that can refute this statement
+
+        For statements:
+                         |              support                     |        against
+        -----------------|------------------------------------------|----------------------------------------
+         Some A is B     | find if there is some area AB            |          {}
+         Some A is not B | find if there is some area A (without B) |          {}
+         All A is B      | find if there is some area AB            | find if there is some area A (without B)
+         All A is not B  | find if there is some area A (without B) | find if there is some area AB
+        -----------------|------------------------------------------|----------------------------------------
+
+        """
+        support = set()
+        against = set()
         for area_label in self.label_id:
-            # TODO should "not all A is B" or "not some A is B" supported?
             if exp.symbol1.token in area_label:
-                # If the current area if part of symbol1 (e.g. A in AB)
+                # TODO should "not all A is B" or "not some A is B" supported?
                 if exp.symbol1.some:
                     # Some A is B -> There must be an AB
                     # Find the areas that contains symbol2 (e.g. AB)
                     # The XOR operator here means if symbol2 is negated, find
                     # the area that does not contain symbol2
-                    if exp.symbol2.neg ^ (exp.symbol2.token in area_label):
-                        prove.add(area_label)
+                        if exp.symbol2.neg ^ (exp.symbol2.token in area_label):
+                            # Check for AB
+                            support.add(area_label)
                 elif exp.symbol1.all:
-                    # All A is B -> There must not be an A or B
+                    # All A is B -> There must not be an A or B (only AB, B)
                     # Find the areas that does not contain symbol2 (e.g. B)
                     # The == operator here means if symbol2 is negated, find
                     # the area that does contain symbol2
                     if exp.symbol2.neg ^ (exp.symbol2.token not in area_label):
-                        refute.add(area_label)
-                    if exp.symbol2.neg ^ (exp.symbol2.token in area_label):
-                        prove.add(area_label)
-
+                        # Check for A
+                        against.add(area_label)
+                    elif exp.symbol2.neg ^ (exp.symbol2.token in area_label):
+                        # Check for AB
+                        support.add(area_label)
+        return support, against
 
     def create_diagram(self):
         """
@@ -107,38 +123,34 @@ class ExpressionSet(object):
 
         # Parse relations
         for exp in self.relations:
-            for area_label in self.label_id:
-                if exp.symbol1.neg ^ (exp.symbol1.token in area_label):
-                    # TODO is "not all A is B" or "not some A is B" supported?
-                    # Some A is B
-                    if exp.symbol1.some:
-                        # The XOR operator here means if symbol2 is negated, find
-                        # the area that does not contain symbol2
-                        if exp.symbol2.neg ^ (exp.symbol2.token in area_label):
-                            if area_label not in self.highlight:
-                                self.highlight[area_label] = []
-                            self.highlight[area_label].append(exp)
-                    # All A is B
-                    elif exp.symbol1.all:
-                        # The == operator here means if symbol2 is negated, find
-                        # the area that does contain symbol2
-                        if exp.symbol2.neg ^ (exp.symbol2.token not in area_label):
-                            if area_label not in self.disable:
-                                self.disable[area_label] = []
-                            self.disable[area_label].append(exp)
+            support, against = self.parse(exp)
+            if exp.symbol1.some:
+                for area_label in support:
+                    if area_label not in self.possible:
+                        self.possible[area_label] = []
+                    self.possible[area_label].append(exp)
+            if exp.symbol1.all:
+                for area_label in support:
+                    if area_label not in self.possible:
+                        self.definite[area_label] = []
+                    self.definite[area_label].append(exp)
+                for area_label in against:
+                    if area_label not in self.disable:
+                        self.disable[area_label] = []
+                    self.disable[area_label].append(exp)
 
-    def show(self, highlight=True):
+    def display_diagram(self, highlight=True):
         """
-        This function evaluates all expressions stored in the current set.
-        Then it displays the diagram
+        This function displays the diagram according to the area codes generated by
+        create_diagram() function.
+        :param highlight: a flag to determine whether to highlight "Some" preconditions
+                          using a background color
         """
         if len(self.label_id) == 0 and len(self.members) != 0:
             print("ERROR: need to parse the expressions first", file=sys.stderr)
             self.parse()
 
-        plt.ion()
-
-        # Create venn diagram
+        # Create venn diagram basic structure
         labels = tuple(sorted(self.members))
         if len(labels) == 2:
             venn = venn2
@@ -156,25 +168,27 @@ class ExpressionSet(object):
                 "ERROR: Currently only at two or three items can be supported but got " + str(labels))
         colors = dict(zip(self.label_id.keys(), list(map(hex_to_rgba, colors))))
 
-        # Draw the venn diagram
-        c = circles(subsets=subsets)
+        # Draw the venn diagram in matplotlib
+        plt.ion()
+        c = circles(subsets=subsets)   # border
         self.diagram = venn(subsets=subsets, set_labels=labels)
-
-        for area_label, color in zip(self.label_id, colors):
+        for area_label, color in zip(self.label_id, colors): # Set areas to white
             self.diagram.get_patch_by_id(self.label_id[area_label]).set_alpha(1.0)
             self.diagram.get_patch_by_id(self.label_id[area_label]).set_facecolor("white")
             self.diagram.get_patch_by_id(self.label_id[area_label]).set_edgecolor((0,0,0,0))
             self.diagram.get_label_by_id(self.label_id[area_label]).set_text("")
 
-        # Legends
+        # Areas
         area_colors, texts = [], []
         if highlight:
-            for area_label, exps in self.highlight.items():
+            # Hightlight "Some" preconditions using a background color
+            for area_label, exps in self.possible.items():
                 for exp in exps:
                     area = self.diagram.get_patch_by_id(self.label_id[area_label])
                     area.set_facecolor(colors[area_label])
                     area_colors.append(area)
                     texts.append(str(exp))
+        # Disable areas should be marked black
         for area_label, exps in self.disable.items():
             for exp in exps:
                 area = self.diagram.get_patch_by_id(self.label_id[area_label])
@@ -182,110 +196,99 @@ class ExpressionSet(object):
                 area_colors.append(area)
                 texts.append(str(exp))
 
-        # Display the diagram
+        # Display the legend
         # self.fig.legend(handles=area_colors, labels=texts) #,
         # loc='center left',
         # bbox_to_anchor=(1, 0.5))
-        # plt.show(block=True)
 
-    def evaluate(self, exp: Expression, show=False):
+    def evaluate(self, exp: Expression, show=False, print_log=False):
         """
-        This function evaluates the validity of a statement
+        This function evaluates the validity of a statement and displays it on the diagram
         :param exp:
         :param show:
+        :param log:
         :return:
         """
-        expression_area = set()
-        correct_area = set()
-        # To parse:
-        #    Some A is B: find if there is some area AB -> true
-        #    All A is B:  find if there is some area A (without B) -> false
-        #    Some A is not B: find if there is some area A (without B) -> true
-        #    All A is not B:  find if there is some area AB -> false
-        #
-        for area_label in self.label_id:
-            # TODO should "not all A is B" or "not some A is B" supported?
-            if exp.symbol1.token in area_label:
-                # If the current area if part of symbol1 (e.g. A in AB)
-                if exp.symbol1.some:
-                    # Some A is B
-                    # Find the areas that contains symbol2 (e.g. B in AB)
-                    # The XOR operator here means if symbol2 is negated, find
-                    # the area that does not contain symbol2
-                    if exp.symbol2.neg ^ (exp.symbol2.token in area_label):
-                        expression_area.add(area_label)
-                ## TODO still problem here
-                elif exp.symbol1.all:
-                    # All A is B
-                    # Find the areas that does not contain symbol2 (e.g. B not in AB)
-                    # The == operator here means if symbol2 is negated, find
-                    # the area that does contain symbol2
-                    if exp.symbol2.neg ^ (exp.symbol2.token not in area_label):
-                        expression_area.add(area_label)
-                    if exp.symbol2.neg ^ (exp.symbol2.token in area_label):
-                        correct_area.add(area_label)
-        valid_area = expression_area - set(self.disable.keys())
+        support_area, against_area = self.parse(exp)
+        valid_support_area = support_area - set(self.disable.keys())
+        valid_against_area = against_area - set(self.disable.keys())
 
-        if show:
-            if exp.symbol1.some:
-                if len(valid_area) == 0:
-                    for area_label in expression_area:
-                        # Display areas that satisfies the expression but disabled by diagram
-                        self.diagram.get_patch_by_id(
-                            self.label_id[area_label]).set_edgecolor("red")
-                        self.diagram.get_patch_by_id(
-                            self.label_id[area_label]).set_linewidth(2)
-                        self.diagram.get_patch_by_id(
-                            self.label_id[area_label]).set_hatch('///')
-                else:
-                    for area_label in valid_area:
-                        # Display areas that satisfies the expression
-                        self.diagram.get_patch_by_id(
-                            self.label_id[area_label]).set_edgecolor("green")
-                        self.diagram.get_patch_by_id(
-                            self.label_id[area_label]).set_linewidth(2)
-                        self.diagram.get_patch_by_id(
-                            self.label_id[area_label]).set_hatch('xxx')
-            elif exp.symbol1.all:
-                if len(valid_area) == 0:
-                    if not exp.symbol2.neg:
-                        area = correct_area - set(self.disable.keys())
-                    else:
-                        area = correct_area - set(self.disable.keys())
-                        for area_label in self.label_id:
-                            if exp.symbol1.token in area_label and exp.symbol2.token in area_label:
-                                area.add(area_label)
-                    for area_label in area:
-                        # Display areas that satisfies the expression
-                        self.diagram.get_patch_by_id(
-                            self.label_id[area_label]).set_edgecolor("green")
-                        self.diagram.get_patch_by_id(
-                            self.label_id[area_label]).set_linewidth(2)
-                        self.diagram.get_patch_by_id(
-                            self.label_id[area_label]).set_hatch('xxx')
-                else:
-                    for area_label in valid_area:
-                        # Display areas that refutes the expression
-                        self.diagram.get_patch_by_id(
-                            self.label_id[area_label]).set_edgecolor("red")
-                        self.diagram.get_patch_by_id(
-                            self.label_id[area_label]).set_linewidth(2)
-                        self.diagram.get_patch_by_id(
-                            self.label_id[area_label]).set_hatch('///')
+        def mark_green(area: set):
+            if show:
+                for area_label in area:
+                    self.diagram.get_patch_by_id(
+                        self.label_id[area_label]).set_edgecolor("green")
+                    self.diagram.get_patch_by_id(
+                        self.label_id[area_label]).set_linewidth(2)
+                    self.diagram.get_patch_by_id(
+                        self.label_id[area_label]).set_hatch('xxx')
+
+        def mark_red(area: set):
+            if show:
+                for area_label in area:
+                    self.diagram.get_patch_by_id(
+                        self.label_id[area_label]).set_edgecolor("red")
+                    self.diagram.get_patch_by_id(
+                        self.label_id[area_label]).set_linewidth(2)
+                    self.diagram.get_patch_by_id(
+                        self.label_id[area_label]).set_hatch('///')
+
+        def log(*arg):
+            if (print_log):
+                print(arg)
 
         if exp.symbol1.some:
-            if len(valid_area) == 0:
-                print("Evaluation failed")
+            # Some A is B
+            if len(valid_support_area) != 0:
+                # There is some area AB that can prove this statement
+                definite_support_area = valid_support_area.intersection(self.definite.keys())
+                if len(definite_support_area) > 0:
+                    mark_green(definite_support_area)
+                    # if len(valid_support_area - self.possible.keys()) == 0:
+                    return True, "This is a TRUE statement. The green shadow in the diagram shows all valid areas."
+                else:
+                    mark_green(valid_support_area)
+                    return False, "This statement may be TRUE but not necessarily TRUE.\n The green shadow in the diagram shows areas satisfies the expression but they may be empty."
+            else:
+                # There is some area AB that can prove this statement but are disabled
+                mark_red(support_area)
                 return False, "This is a FALSE statement. The red shadow in the diagram shows all areas that fits the statement, but they are all invalid."
+        elif exp.symbol1.all and exp.symbol1.token == exp.symbol2.token:
+            if not exp.symbol2.neg:
+                # All A is A
+                if exp in self:
+                    mark_green(support_area)
+                    return True, "This is a TRUE statement. The green shadow in the diagram shows all valid areas."
+                else:
+                    mark_red(support_area)
+                    return False, "This is a FALSE statement. The red shadow in the diagram shows all areas that fits the statement, but they are all invalid."
+                pass
             else:
-                print("Evaluation successful")
-                print(valid_area)
-                return True, "This is a TRUE statement. The green shadow in the diagram shows all valid areas."
+                # All A is not A
+                if exp in self:
+                    mark_green(support_area)
+                    return True, "This is a TRUE statement. The green shadow in the diagram shows all valid areas."
+                else:
+                    mark_red(support_area)
+                    return False, "This is a FALSE statement. The red shadow in the diagram shows all areas that fits the statement, but they are all invalid."
+                pass
         elif exp.symbol1.all:
-            if len(valid_area) == 0:
-                print("Evaluation successful")
-                print(valid_area)
-                return True, "This is a TRUE statement. The green shadow in the diagram shows all areas satisfies the expression."
+            # All A is B
+            if len(valid_against_area) != 0:
+                definite_against_area = valid_against_area.intersection(self.definite.keys())
+                if len(definite_against_area) > 0:
+                    mark_red(definite_against_area)
+                    return False, "This is a FALSE statement. The red shadow in the diagram shows all areas that refutes the statement."
+                else:
+                    mark_red(valid_against_area)
+                    return False, "This statement may be FALSE but not necessarily FALSE.\n The red shadow in the diagram shows all areas that refutes the statement but they may be empty."
             else:
-                print("Evaluation failed")
-                return False, "This is a FALSE statement. The red shadow in the diagram shows all areas that refutes the statement."
+                if len(valid_support_area) != 0:
+                    mark_green(valid_support_area)
+                    return True, "This is a TRUE statement. The green shadow in the diagram shows all valid areas."
+                else:
+                    mark_red(support_area)
+                    return False, "This is a FALSE statement. The red shadow in the diagram shows all areas that fits the statement, but they are all invalid."
+
+
+
