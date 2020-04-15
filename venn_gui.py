@@ -11,9 +11,6 @@ from expression import Expression
 from expression_set import ExpressionSet
 
 
-# TODO move the X once X is on a border with black
-
-
 class VennGUI(object):
     def __init__(self):
         self.filename = ""
@@ -240,8 +237,9 @@ class VennGUI(object):
         self.collect = ExpressionSet()
         if self.premises_box.get("1.0", tk.END) == "":
             return
+        # Add all premises
         try:
-            self.collect.premises(self.premises_box.get("1.0", tk.END).replace(';', '\n'))
+            self.collect.add_premises(self.premises_box.get("1.0", tk.END).replace(';', '\n'))
         except NameError as e:
             self.msg_text.set(str(e))
             self.msg_label.configure(foreground="red")
@@ -258,7 +256,13 @@ class VennGUI(object):
             return
         if self.collect.empty() or len(self.collect) == 1:
             return
-        self.collect.parse_premises()
+        # Parse premises
+        try:
+            self.collect.parse_premises()
+        except ValueError as e:
+            self.msg_text.set(str(e))
+            self.msg_label.configure(foreground="red")
+            return
         self.collect.display_diagram(highlight_some=bool(self.is_possible_highlight.get()))
         self.fig.canvas.flush_events()
         self.fig.canvas.draw()

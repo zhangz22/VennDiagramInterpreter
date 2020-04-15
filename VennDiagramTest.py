@@ -11,15 +11,16 @@ MAYBE_FALSE = (False, False)
 
 
 class VennDiagramTestCase(unittest.TestCase):
-    def simple_test(self, premises, exp, expected, show=False):
+    SHOW_BY_DEFAULT = True
+
+    def simple_test(self, premises, exp, expected, show=SHOW_BY_DEFAULT):
         s = ExpressionSet()
-        s.premises(premises)
+        s.add_premises(premises)
         s.parse_premises()
         if show:
             s.display_diagram()
         ret = s.evaluate(Expression(exp), show=show)
         if show:
-            s.venn_diagram.show_argument(exp)
             plt.show()
         self.assertEqual((ret[0], ret[1]), expected)
 
@@ -54,7 +55,7 @@ class VennDiagramTestCase(unittest.TestCase):
         exp = "Some A's are C's"
         self.simple_test(premises, exp, MAYBE_TRUE)
 
-    def test_all_some_2(self):
+    def test_all_some_some(self):
         premises = """All A's are B's\n
                       Some C's are A's"""
         exp = "Some C's are B's"
@@ -78,6 +79,21 @@ class VennDiagramTestCase(unittest.TestCase):
                       Some A's are C's"""
         exp = "Some A's are C's"
         self.simple_test(premises, exp, TRUE, show=True)
+
+    def test_premises_conflict(self):
+        premises = """All B's are not A's\n
+                      Some B's are A's\n
+                      Some B's are C's\n
+                      Some C's are A's\n
+                      Some C's are not B's\n
+                      Some A's are C's"""
+        exp = "Some A's are C's"
+        try:
+            self.simple_test(premises, exp, TRUE, show=True)
+        except ValueError as e:
+            self.assertEqual(str(e),
+                             "Error: conflicts happens between [\"Some B's are A's\"]"
+                             " and [\"All B's are not A's\"]", "Error message")
 
 
 if __name__ == '__main__':

@@ -105,7 +105,7 @@ class ExpressionSet(object):
             raise ValueError("ERROR: Only two or three sets can be supported but "
                              "the program got " + str(self.members))
 
-    def premises(self, premises: str):
+    def add_premises(self, premises: str):
         """
         Parse a paragraph of premises and add expressions (relation between sets) or
         set names to the diagram
@@ -212,6 +212,15 @@ class ExpressionSet(object):
                         self.black[area_label] = []
                     self.black[area_label].append(exp)
 
+        # Check for conflicts
+        for label_pair in self.cross:
+            if len(list(filter(lambda x: x not in self.black, label_pair))) == 0:
+                black_intersection_exps = set()
+                for label in label_pair:
+                    if label in self.black:
+                        black_intersection_exps = black_intersection_exps.union(set(self.black[label]))
+                raise ValueError("Error: conflicts happens between " + str([str(x) for x in self.cross[label_pair]]) + " and " + str([str(x) for x in black_intersection_exps]))
+
     def is_area_definite(self, target: set, lhs: Token):
         """
         :param target: a large area being checked composed by small areas represented
@@ -288,6 +297,7 @@ class ExpressionSet(object):
                                         color=results[result]["color"],
                                         pattern=results[result]["pattern"])
             self.venn_diagram.show_validatity(results[result]["validity"] and results[result]["must"])
+            self.venn_diagram.show_argument(exp)
 
         return results[result]["validity"], results[result]["must"], results[result]["reason"]
 

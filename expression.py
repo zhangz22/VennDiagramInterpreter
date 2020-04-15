@@ -40,7 +40,7 @@ class Token(object):
     def __str__(self):
         ret = ""
         if self.neg:
-            ret += "Not "
+            ret += "not "
         if self.some:
             ret += "some " if ret != "" else "Some "
         elif self.all:
@@ -56,7 +56,13 @@ class Token(object):
                self.all == other.all and self.neg == other.neg
 
     def __hash__(self):
-        return hash((self.name, self.some, self.all, self.neg))
+        prime = 31
+        result = 1
+        result = prime * result + hash(self.name) if self.name is not None else 0
+        result = prime * result + hash(self.some) if self.some is not None else 0
+        result = prime * result + hash(self.all) if self.all is not None else 0
+        result = prime * result + hash(self.neg) if self.neg is not None else 0
+        return result
 
 
 class Expression(object):
@@ -87,11 +93,11 @@ class Expression(object):
         if lhs.neg or rhs.all or rhs.some:
             raise SyntaxError("Invalid expression \"" + exp + "\"")
         if lhs.name == rhs.name:
-            raise SyntaxError("Invalid expression with identical set name \"{}\"".format(lhs))
+            raise SyntaxError("Invalid expression with identical set name \"{}\"".format(lhs.name))
         return lhs, rhs
 
     def __str__(self):
-        return str(self.lhs) + "'s are " + str(self.rhs) + "'s"
+        return str(self.lhs) + " are " + str(self.rhs)
 
     def __contains__(self, key):
         if isinstance(key, str):
@@ -111,6 +117,6 @@ class Expression(object):
     def __hash__(self):
         prime = 31
         result = 1
-        result = prime * result + hash(self.lhs)
-        result = prime * result + hash(self.rhs)
+        result = prime * result + hash(self.lhs) if self.lhs is not None else 0
+        result = prime * result + hash(self.rhs) if self.lhs is not None else 0
         return result
