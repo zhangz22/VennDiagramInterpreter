@@ -212,29 +212,22 @@ class VennGUI(object):
         self.collect = ExpressionSet()
         if self.premises_box.get("1.0", tk.END) == "":
             return
-        for line in self.premises_box.get("1.0", tk.END).replace(';', '\n').split(
-                '\n'):
-            line = line.strip()
-            if line == "": continue
-            try:
-                if "are" in line or "is" in line:
-                    self.collect.append(Expression(line))  # self.collection
-                else:
-                    self.collect.append(line)  # Expression
-            except NameError as e:
-                self.msg_text.set(str(e))
-                self.msg_label.configure(foreground="red")
-            except TypeError as e:
-                print(e, file=sys.stderr)
-                pass
-            except ValueError as e:
-                self.msg_text.set(str(e))
-                self.msg_label.configure(foreground="red")
-                return
-            except SyntaxError as e:
-                self.msg_text.set(str(e))
-                self.msg_label.configure(foreground="red")
-                return
+        try:
+            self.collect.premises(self.premises_box.get("1.0", tk.END).replace(';', '\n'))
+        except NameError as e:
+            self.msg_text.set(str(e))
+            self.msg_label.configure(foreground="red")
+        except TypeError as e:
+            print(e, file=sys.stderr)
+            pass
+        except ValueError as e:
+            self.msg_text.set(str(e))
+            self.msg_label.configure(foreground="red")
+            return
+        except SyntaxError as e:
+            self.msg_text.set(str(e))
+            self.msg_label.configure(foreground="red")
+            return
         if self.collect.empty() or len(self.collect) == 1:
             return
         self.collect.parse_premises()

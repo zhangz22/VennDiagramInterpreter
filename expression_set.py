@@ -37,7 +37,7 @@ class ExpressionSet(object):
         self.members = set()  # A set of strings representing members (A,B,C...)
         self.label_id = {}  # A set of all labels in the diagram (A,B,AB...)
         self.crosses = {}  # A dictionary containing tuple of area code -> list of expressions that is emphasized by "Some" statements
-        self.disable = {}
+        self.black = {}
         self.venn_diagram = None  # The venn diagram objects
 
     def __contains__(self, key):
@@ -92,6 +92,15 @@ class ExpressionSet(object):
             raise ValueError("ERROR: Only two or three sets can be supported but "
                              "the program got " + str(self.members))
 
+    def premises(self, premises):
+        for line in premises.split("\n"):
+            line = line.strip()
+            if line == "": continue
+            if "are" in line or "is" in line:
+                self.append(Expression(line))  # self.collection
+            else:
+                self.append(line)  # Expression
+
     # LOGIC RELATED FUNCTIONS
     def parse(self, exp: Expression):
         """
@@ -103,13 +112,13 @@ class ExpressionSet(object):
 
         For statements:
                          | support:                       | against:
-                         | one of them should exist (Some)| none of them should exist
-                         | one of them may exist (All)    | none of them should exist
         -----------------|--------------------------------|--------------------------
+                         | one of them should exist       |
          Some A is B     | (AB, ABC)                      |   {}
          Some A is not B | (A, AC)                        |   {}
-         All A is B      | (AB, ABC)                      |   {A, AC}
-         All A is not B  | (A, AC)                        |   {AB, ABC}
+                         | some or none of them may exist | none of them should exist
+         All A is B      | (AB, ABC)                      | {A, AC}
+         All A is not B  | (A, AC)                        | {AB, ABC}
         -----------------|--------------------------------|--------------------------
         """
         support = set()
@@ -177,9 +186,9 @@ class ExpressionSet(object):
                 # self.possible_all[support].append(exp)
                 # Any of the labels in the set against should be disabled
                 for area_label in against:
-                    if area_label not in self.disable:
-                        self.disable[area_label] = []
-                    self.disable[area_label].append(exp)
+                    if area_label not in self.black:
+                        self.black[area_label] = []
+                    self.black[area_label].append(exp)
 
     def get_all_possible_area(self):
         """
@@ -187,7 +196,7 @@ class ExpressionSet(object):
                  least one of the area in the diagram is true
         """
         all_possible_combines = list(
-            map(lambda x: set(x) - self.disable.keys(), self.crosses.keys()))
+            map(lambda x: set(x) - self.black.keys(), self.crosses.keys()))
         return all_possible_combines
 
     def is_area_definite(self, target: set):
@@ -202,6 +211,19 @@ class ExpressionSet(object):
                 return True
         return False
 
+    results = {
+        "TRUE": {"validity": True, "must": True, "color": "green", "pattern": "///",
+                 "reason": "This is a TRUE statement. The green shadow in the diagram shows all valid areas."},
+        "MAYBE TRUE": {"validity": True, "must": False, "color": "green", "pattern": "..",
+                       "reason": "This statement may be TRUE but not necessarily TRUE.\n The green shadow in the diagram shows areas satisfies the expression but they may be empty."},
+        "NO TRUE": {"validity": False, "must": True, "color": "red", "pattern": "xxx",
+                  "reason": "This is a FALSE statement. The red shadow in the diagram shows all areas that fits the statement, but they are all invalid."},
+        "FALSE": {"validity": False, "must": True, "color": "red", "pattern": "xxx",
+                  "reason": "This is a FALSE statement. The red shadow in the diagram shows all areas that refutes the statement."},
+        "MAYBE FALSE": {"validity": False, "must": False, "color": "red", "pattern": "+",
+                        "reason": "This statement may be FALSE but not necessarily FALSE.\n The red shadow in the diagram shows all areas that refutes the statement but they may be empty."}
+    }
+
     def evaluate(self, exp: Expression, show=False):
         """
         This function evaluates the validity of a statement and displays it on the diagram
@@ -215,42 +237,48 @@ class ExpressionSet(object):
             return False, True, "Set name(s) not found: " + str(unknown).strip("{").strip("}")
 
         # Get area code results for the expression being validated
-        support_area, against_area = self.parse(exp)
-        valid_support_area = set(support_area) - set(self.disable.keys())
-        valid_against_area = against_area - set(self.disable.keys())
+        support, against = self.parse(exp)
+        valid_support_area = set(support) - set(self.black.keys())
+        valid_against_area = against - set(self.black.keys())
 
-        if len(valid_against_area) != 0:
-            if self.is_area_definite(valid_against_area):
-                if show:
-                    self.mark_area(valid_against_area.intersection(set().union(*self.get_all_possible_area())), color="red", pattern="xxx")
-                    self.show_validatity(False)
-                return False, True, "This is a FALSE statement. The red shadow in the diagram shows all areas that refutes the statement."
+        # Conclusion
+        if exp.symbol1.some:
+            # Definitely true -> support should cover an X
+            # Possibly true -> support covers part of an X / support are all unknown
+            # Definitely false -> support are all black
+            if len(valid_support_area) == 0:
+                result = "NO TRUE"
+            elif self.is_area_definite(valid_support_area):
+                result = "TRUE"
             else:
-                if show:
-                    self.mark_area(valid_against_area, color="red", pattern='+')
-                    self.show_validatity(False)
-                return False, False, "This statement may be FALSE but not necessarily FALSE.\n The red shadow in the diagram shows all areas that refutes the statement but they may be empty."
+                result = "MAYBE TRUE"
         else:
-            if len(valid_support_area) != 0:
-                # There is some area AB that can prove this statement
-                if self.is_area_definite(valid_support_area):
-                    if show:
-                        self.mark_area(valid_support_area.intersection(set().union(*self.get_all_possible_area())), color="green", pattern="///")
-                        self.show_validatity(True)
-                    return True, True, "This is a TRUE statement. The green shadow in the diagram shows all valid areas."
-                else:
-                    if show:
-                        self.mark_area(valid_support_area, color="green", pattern='..')
-                        self.show_validatity(False)
-                    return True, False, "This statement may be TRUE but not necessarily TRUE.\n The green shadow in the diagram shows areas satisfies the expression but they may be empty."
+            # Definitely false -> at least one of against is not black
+            # Possibly false -> again covers part of an X / support are all unknown
+            # Definitely true -> has valid support area
+            if len(valid_support_area) > 0:
+                result = "TRUE"
+            elif self.is_area_definite(valid_against_area):
+                result = "FALSE"
             else:
-                # There is some area AB that can prove this statement but are disabled
-                if show:
-                    self.mark_area(set(support_area), color="red", pattern="xxx")
-                    self.show_validatity(False)
-                return False, True, "This is a FALSE statement. The red shadow in the diagram shows all areas that fits the statement, but they are all invalid."
+                result = "MAYBE FALSE"
 
-    # VISUALIZATION RELATED
+        if show:
+            if result == "NO TRUE":
+                marked = set(support)
+            elif result == "TRUE" or result == "MAYBE TRUE":
+                marked = set(valid_support_area)
+            else:
+                marked = against
+            self.mark_area(marked, color=ExpressionSet.results[result]["color"], pattern=ExpressionSet.results[result]["pattern"])
+            self.show_validatity(ExpressionSet.results[result]["validity"] and ExpressionSet.results[result]["must"])
+
+        return ExpressionSet.results[result]["validity"], ExpressionSet.results[result]["must"], ExpressionSet.results[result]["reason"]
+
+
+    # ===============================================================================
+    # VISUALIZATION RELATED FUNCTIONS
+    # ===============================================================================
     def display_diagram(self, highlight_some=True):
         """
         This function displays the diagram according to the area codes generated by
@@ -307,7 +335,7 @@ class ExpressionSet(object):
                     color_area(area_label)
 
         # Disabled areas should be marked black
-        for area_label, exps in self.disable.items():
+        for area_label, exps in self.black.items():
             for exp in exps:
                 area = self.venn_diagram.get_patch_by_id(self.label_id[area_label])
                 area.set_alpha(1.0)
@@ -320,106 +348,106 @@ class ExpressionSet(object):
         # loc='center left',
         # bbox_to_anchor=(1, 0.5))
 
-        def get_intersect_pos(self, areas: tuple):
-            """
-            :param areas: a pair of area labels (A,B)/(A,C)...
-            :return: the position or rotation of a "X" symbol between these two areas on
-                     the diagram
-            """
-            labels = tuple(sorted(self.members))
-            get_center_pos = lambda id1, id2: (
-                                                      np.array(
-                                                          self.venn_diagram.get_label_by_id(
-                                                              id1).get_position()) +
-                                                      np.array(
-                                                          self.venn_diagram.get_label_by_id(
-                                                              id2).get_position())) / 2
-            if len(labels) == 2:
-                A, B = labels[0], labels[1]
-                if areas == (A, A + B) or areas == (A + B, A):
-                    pos = get_center_pos('100', '110')
-                    pos[0] *= 0.9;
-                    pos[1] *= 0.8
-                    rot = 0
-                    return pos, rot
-                elif areas == (B, A + B) or areas == (A + B, B):
-                    pos = get_center_pos('010', '110')
-                    pos[0] *= 0.9;
-                    pos[1] *= 0.8
-                    rot = 0
-                    return pos, rot
-            elif len(labels) == 3:
-                A, B, C = labels[0], labels[1], labels[2]
-                if areas == (A, A + B) or areas == (A + B, A):
-                    pos = get_center_pos('100', '110')
-                    pos[0] *= 0.63
-                    rot = 165
-                    return pos, rot
-                elif areas == (B, A + B) or areas == (A + B, B):
-                    pos = get_center_pos('010', '110')
-                    pos[0] *= 0.6
-                    rot = 15
-                    return pos, rot
-                elif areas == (A, A + C) or areas == (A + C, A):
-                    pos = get_center_pos('100', '101')
-                    pos[0] *= 0.95;
-                    pos[1] *= -0.8
-                    rot = 45
-                    return pos, rot
-                elif areas == (B, B + C) or areas == (B + C, B):
-                    pos = get_center_pos('010', '011')
-                    pos[0] *= 0.95;
-                    pos[1] *= -0.6
-                    rot = 135
-                    return pos, rot
-                elif areas == (C, A + C) or areas == (A + C, C):
-                    pos = get_center_pos('001', '101')
-                    pos[0] *= 1.45;
-                    pos[1] *= 0.85
-                    rot = 10
-                    return pos, rot
-                elif areas == (C, B + C) or areas == (B + C, C):
-                    pos = get_center_pos('001', '011')
-                    pos[0] *= 1.45;
-                    pos[1] *= 0.82
-                    rot = 170
-                    return pos, rot
-                elif areas == (A + B, A + B + C) or areas == (A + B + C, A + B):
-                    pos = get_center_pos('110', '111')
-                    pos[1] *= 0.8;
-                    rot = 0
-                    return pos, rot
-                elif areas == (A + C, A + B + C) or areas == (A + B + C, A + C):
-                    pos = get_center_pos('011', '111')
-                    pos[0] *= -0.9;
-                    pos[1] *= 1.4
-                    rot = 125
-                    return pos, rot
-                elif areas == (B + C, A + B + C) or areas == (A + B + C, B + C):
-                    pos = get_center_pos('101', '111')
-                    pos[0] *= -1;
-                    pos[1] *= 1.4
-                    rot = 55
-                    return pos, rot
-            return get_center_pos(self.label_id[areas[0]],
-                                  self.label_id[areas[1]]), 0
+    def get_intersect_pos(self, areas: tuple):
+        """
+        :param areas: a pair of area labels (A,B)/(A,C)...
+        :return: the position or rotation of a "X" symbol between these two areas on
+                 the diagram
+        """
+        labels = tuple(sorted(self.members))
+        get_center_pos = lambda id1, id2: (
+                                                  np.array(
+                                                      self.venn_diagram.get_label_by_id(
+                                                          id1).get_position()) +
+                                                  np.array(
+                                                      self.venn_diagram.get_label_by_id(
+                                                          id2).get_position())) / 2
+        if len(labels) == 2:
+            A, B = labels[0], labels[1]
+            if areas == (A, A + B) or areas == (A + B, A):
+                pos = get_center_pos('100', '110')
+                pos[0] *= 0.9;
+                pos[1] *= 0.8
+                rot = 0
+                return pos, rot
+            elif areas == (B, A + B) or areas == (A + B, B):
+                pos = get_center_pos('010', '110')
+                pos[0] *= 0.9;
+                pos[1] *= 0.8
+                rot = 0
+                return pos, rot
+        elif len(labels) == 3:
+            A, B, C = labels[0], labels[1], labels[2]
+            if areas == (A, A + B) or areas == (A + B, A):
+                pos = get_center_pos('100', '110')
+                pos[0] *= 0.63
+                rot = 165
+                return pos, rot
+            elif areas == (B, A + B) or areas == (A + B, B):
+                pos = get_center_pos('010', '110')
+                pos[0] *= 0.6
+                rot = 15
+                return pos, rot
+            elif areas == (A, A + C) or areas == (A + C, A):
+                pos = get_center_pos('100', '101')
+                pos[0] *= 0.95;
+                pos[1] *= -0.8
+                rot = 45
+                return pos, rot
+            elif areas == (B, B + C) or areas == (B + C, B):
+                pos = get_center_pos('010', '011')
+                pos[0] *= 0.95;
+                pos[1] *= -0.6
+                rot = 135
+                return pos, rot
+            elif areas == (C, A + C) or areas == (A + C, C):
+                pos = get_center_pos('001', '101')
+                pos[0] *= 1.45;
+                pos[1] *= 0.85
+                rot = 10
+                return pos, rot
+            elif areas == (C, B + C) or areas == (B + C, C):
+                pos = get_center_pos('001', '011')
+                pos[0] *= 1.45;
+                pos[1] *= 0.82
+                rot = 170
+                return pos, rot
+            elif areas == (A + B, A + B + C) or areas == (A + B + C, A + B):
+                pos = get_center_pos('110', '111')
+                pos[1] *= 0.8;
+                rot = 0
+                return pos, rot
+            elif areas == (A + C, A + B + C) or areas == (A + B + C, A + C):
+                pos = get_center_pos('011', '111')
+                pos[0] *= -0.9;
+                pos[1] *= 1.4
+                rot = 125
+                return pos, rot
+            elif areas == (B + C, A + B + C) or areas == (A + B + C, B + C):
+                pos = get_center_pos('101', '111')
+                pos[0] *= -1;
+                pos[1] *= 1.4
+                rot = 55
+                return pos, rot
+        return get_center_pos(self.label_id[areas[0]],
+                              self.label_id[areas[1]]), 0
 
-        def mark_intersect(self, area_labels: tuple):
-            """
-            This function marks "X" symbol(s) on the edge line(s) between areas
-            :param area_labels: labels of areas (A,B...)
-            """
-            if len(area_labels) < 2:
-                return
-            for i in range(len(area_labels)):
-                for j in range(i + 1, len(area_labels)):
-                    pos, rot = self.get_intersect_pos(
-                        (area_labels[i], area_labels[j]))
-                    size = (5 - len(self.members)) * 7
-                    plt.annotate('X', xy=pos, rotation=rot, xytext=(0, 0),
-                                 weight='bold',
-                                 size=size,
-                                 ha='center', textcoords='offset points')
+    def mark_intersect(self, area_labels: tuple):
+        """
+        This function marks "X" symbol(s) on the edge line(s) between areas
+        :param area_labels: labels of areas (A,B...)
+        """
+        if len(area_labels) < 2:
+            return
+        for i in range(len(area_labels)):
+            for j in range(i + 1, len(area_labels)):
+                pos, rot = self.get_intersect_pos(
+                    (area_labels[i], area_labels[j]))
+                size = (5 - len(self.members)) * 7
+                plt.annotate('X', xy=pos, rotation=rot, xytext=(0, 0),
+                             weight='bold',
+                             size=size,
+                             ha='center', textcoords='offset points')
 
     def mark_area(self, area: set, color="red", pattern='xxx'):
         """
