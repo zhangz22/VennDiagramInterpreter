@@ -18,17 +18,25 @@ pip install matplotlib-venn
 
 ### How to use: 
 ```
-usage: venn_gui.py [-h] [-f F] [-e EVAL] [--no_window]
+usage: venn_gui.py [-h] [-f FILENAME] [-e EVAL] [--no_window]
+                   [--export EXPORT]
 
 optional arguments:
   -h, --help            show this help message and exit
-  -f F                  Read premises from local file
+  -f FILENAME, --filename FILENAME
+                        Read premises from local file
   -e EVAL, --eval EVAL  The argument being validated
   --no_window           Get the result immediately without showing the
-                        interactive window (Note: only works in an IDE)
+                        interactive window (Need -f argument)
+  --export EXPORT       Export the result to an image file (Need -f and
+                        --no_window argument)
+
 ```
 - filename: if specified, the program will read from the file automatically at startup.
 - eval: if specified, the program will automatically validate the argument
+- no_window: if specified, the program will display the result without the interpreter window
+- export: if specified, the program will automatically save the diagram to an image file. 
+          (Only available in no_window mode)
 
 ### Local file usage:
 The file should contains all premises in logic arguments. 
@@ -65,4 +73,4 @@ All B's are C's <br>
 ```
 python venn_gui.py -f example/example2.venn --eval "All A's are C's" --no_window
 ```
-![exampl1](example/example2_no_window.png)
+![exampl2](example/example2_no_window.png)

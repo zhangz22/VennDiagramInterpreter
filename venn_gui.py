@@ -13,7 +13,26 @@ from expression_set import ExpressionSet
 
 
 class VennGUI(object):
-    def __init__(self):
+    def __init__(self, argv):
+        """
+        :param argv: arguments for running the program
+                     Usage: venn_gui.py <-f filename>
+        """
+        # Arguments
+        parser = argparse.ArgumentParser()
+        parser.add_argument("-f", "--filename", help="Read premises from local file",
+                            type=str)
+        parser.add_argument("-e", "--eval", help="The argument being validated",
+                            type=str)
+        parser.add_argument("--no_window", help="Get the result immediately without"
+                                                " showing the interactive window "
+                                                "(Need -f argument)",
+                            action="store_true")
+        parser.add_argument("--export", help="Export the result to an image file "
+                                             "(Need -f and --no_window argument)",
+                            type=str)
+        self.args = parser.parse_args(argv[1:])
+        # Basic components
         self.filename = ""
         self.filepath = ""
         self.collect = None
@@ -26,41 +45,42 @@ class VennGUI(object):
         self.is_possible_highlight = None
         self.show_exp_in_diagram = None
         self.eval_box = None
-        self.no_window = True
-        self.set_up()
+        if not self.args.no_window:
+            self.set_up()
 
     # ===============================================================================
     #                         Basic GUI related operations
     # ===============================================================================
-    def run(self, argv):
+    def run(self):
         """
         Start the GUI window
-        :param argv: arguments for running the program
-                     Usage: venn_gui.py <-f filename>
         """
-
-        parser = argparse.ArgumentParser()
-        parser.add_argument("-f", help="Read premises from local file",
-                            type=str)
-        parser.add_argument("-e", "--eval", help="The argument being validated",
-                            type=str)
-        parser.add_argument("--no_window", help="Get the result immediately without"
-                                                " showing the interactive window "
-                                                "(Note: only works in an IDE)",
-                            action="store_true")
-        args = parser.parse_args(argv[1:])
-        if args.no_window:
-            self.no_window = True
+        if self.args.no_window:
+            s = ExpressionSet()
+            if self.args.filename:
+                with open(self.args.filename, 'r', encoding='utf8') as f:
+                    premises = f.read()
+                s.add_premises(premises)
+                s.parse_premises()
+                s.display_diagram()
+                if self.args.eval:
+                    ret = s.evaluate(Expression(self.args.eval), show=True)
+                if self.args.export:
+                    plt.savefig(self.args.export)
+                else:
+                    plt.show(block=True)
+            else:
+                print("ERROR: No premises found.", file=sys.stderr)
         else:
-            self.no_window = False
-        if args.f:
-            self.filepath = args.f
-            self.load(new_file=False)
-        if args.eval:
-            self.eval_box.delete(0, tk.END)
-            self.eval_box.insert(0, args.eval)
-            self.evaluate_exp()
-        if not self.no_window:
+            if self.args.filename:
+                self.filepath = self.args.filename
+                self.load(new_file=False)
+            if self.args.eval:
+                self.eval_box.delete(0, tk.END)
+                self.eval_box.insert(0, self.args.eval)
+                self.evaluate_exp()
+            self.root.update()
+            self.root.deiconify()
             self.root.mainloop()
 
     def clear(self):
@@ -92,6 +112,7 @@ class VennGUI(object):
         # Set up GUI
         self.root = tk.Tk()
         self.root.title("Venn Diagram Interpreter")
+        self.root.withdraw()
         tk.Grid.rowconfigure(self.root, 0, weight=1)
         tk.Grid.columnconfigure(self.root, 0, weight=1)
         self.fig = plt.figure(1)
@@ -275,7 +296,7 @@ class VennGUI(object):
             self.msg_label.configure(foreground="red")
             return
         self.collect.display_diagram(highlight_some=bool(self.is_possible_highlight.get()))
-        if not self.no_window:
+        if not self.args.no_window:
             self.fig.canvas.flush_events()
             self.fig.canvas.draw()
 
@@ -303,7 +324,7 @@ class VennGUI(object):
                     self.msg_label.configure(foreground="red")
                 else:
                     self.msg_label.configure(foreground="darkorange")
-            if self.no_window:
+            if self.args.no_window:
                 plt.show(block=True)
             else:
                 self.fig.canvas.flush_events()
@@ -378,5 +399,5 @@ class VennGUI(object):
 
 
 if __name__ == '__main__':
-    gui = VennGUI()
-    gui.run(sys.argv)
+    gui = VennGUI(sys.argv)
+    gui.run()
