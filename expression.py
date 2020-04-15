@@ -15,7 +15,6 @@ class Token(object):
         self.name = name_string.strip("\'s").upper()
 
         # Keywords
-        # TODO should "not all A is B" or "not some A is B" supported?
         loc = 0
         if exp_list[loc] == "not":
             self.neg = True

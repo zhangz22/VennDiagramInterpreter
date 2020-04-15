@@ -11,9 +11,7 @@ from expression import Expression
 from expression_set import ExpressionSet
 
 
-# Always compare different sets TODO
 # TODO move the X once X is on a border with black
-# tODO conclusion/validity
 
 
 class VennGUI(object):
@@ -35,14 +33,14 @@ class VennGUI(object):
     def run(self, argv):
         """
         :param argv: arguments for running the program
-                     Usage: main.py <-f filename>
+                     Usage: venn_gui.py <-f filename>
         """
         if len(argv) > 1:
             for i in range(1, len(argv)):
                 if argv[i] == "-f":
                     if i+1 >= len(argv):
                         print("ERROR: Invalid arguments."
-                              "Usage: main.py <-f filename>", file=sys.stderr)
+                              "Usage: venn_gui.py <-f filename>", file=sys.stderr)
                         sys.exit(1)
                     self.filepath = argv[i+1]
                     self.load(new_file=False)
@@ -343,15 +341,3 @@ class VennGUI(object):
 if __name__ == '__main__':
     gui = VennGUI()
     gui.run(sys.argv)
-
-    # All A's are B's
-    # All B's are C's
-    # Some C's are A's may be wrong if ABC is
-    # All C are not A may be false
-
-    # All A's are B's
-    # Some C's are A's
-
-    # Some C's are B's <- True
-
-    # If I want to know a SOME there must be an X

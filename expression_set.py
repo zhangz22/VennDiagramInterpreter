@@ -205,6 +205,7 @@ class ExpressionSet(object):
                        by labels in the set
         :return: True if this area is sure to be TRUE
         """
+        # TODO Add symbol 1
         all_possible_combines = self.get_all_possible_area()
         for area in all_possible_combines:
             if area.issubset(target):
