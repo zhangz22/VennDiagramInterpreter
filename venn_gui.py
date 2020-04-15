@@ -1,3 +1,4 @@
+import argparse
 import os
 import sys
 
@@ -26,6 +27,7 @@ class VennGUI(object):
         self.is_possible_highlight = None
         self.show_exp_in_diagram = None
         self.eval_box = None
+        self.no_window = True
         self.set_up()
 
     # ===============================================================================
@@ -37,16 +39,30 @@ class VennGUI(object):
         :param argv: arguments for running the program
                      Usage: venn_gui.py <-f filename>
         """
-        if len(argv) > 1:
-            for i in range(1, len(argv)):
-                if argv[i] == "-f":
-                    if i+1 >= len(argv):
-                        print("ERROR: Invalid arguments."
-                              "Usage: venn_gui.py <-f filename>", file=sys.stderr)
-                        sys.exit(1)
-                    self.filepath = argv[i+1]
-                    self.load(new_file=False)
-        self.root.mainloop()
+
+        parser = argparse.ArgumentParser()
+        parser.add_argument("-f", help="Read premises from local file",
+                            type=str)
+        parser.add_argument("-e", "--eval", help="The argument being validated",
+                            type=str)
+        parser.add_argument("--no_window", help="Get the result immediately without"
+                                                " showing the interactive window "
+                                                "(Note: only works in an IDE)",
+                            action="store_true")
+        args = parser.parse_args(argv[1:])
+        if args.no_window:
+            self.no_window = True
+        else:
+            self.no_window = False
+        if args.f:
+            self.filepath = args.f
+            self.load(new_file=False)
+        if args.eval:
+            self.eval_box.delete(0, tk.END)
+            self.eval_box.insert(0, args.eval)
+            self.evaluate_exp()
+        if not self.no_window:
+            self.root.mainloop()
 
     def clear(self):
         """ Empty the diagram, premises box and evaluation box """
@@ -272,8 +288,9 @@ class VennGUI(object):
             self.msg_label.configure(foreground="red")
             return
         self.collect.display_diagram(highlight_some=bool(self.is_possible_highlight.get()))
-        self.fig.canvas.flush_events()
-        self.fig.canvas.draw()
+        if not self.no_window:
+            self.fig.canvas.flush_events()
+            self.fig.canvas.draw()
 
     # "Update" button
     def evaluate_exp(self):
@@ -299,8 +316,11 @@ class VennGUI(object):
                     self.msg_label.configure(foreground="red")
                 else:
                     self.msg_label.configure(foreground="darkorange")
-            self.fig.canvas.flush_events()
-            self.fig.canvas.draw()
+            if self.no_window:
+                plt.show(block=True)
+            else:
+                self.fig.canvas.flush_events()
+                self.fig.canvas.draw()
         except SyntaxError as e:
             self.msg_text.set(str(e))
             self.msg_label.configure(foreground="red")

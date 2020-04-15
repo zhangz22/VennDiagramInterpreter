@@ -305,4 +305,4 @@ class ExpressionSet(object):
         return results[result]["validity"], results[result]["must"], results[result]["reason"]
 
     def display_diagram(self, highlight_some=True):
-        self.venn_diagram.display_diagram(highlight_some)
+        self.venn_diagram.create_diagram(highlight_some)
