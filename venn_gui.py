@@ -30,8 +30,12 @@ class VennGUI(object):
         self.eval_box = None
         self.set_up()
 
+    # ===============================================================================
+    #                         Basic GUI related operations
+    # ===============================================================================
     def run(self, argv):
         """
+        Start the GUI window
         :param argv: arguments for running the program
                      Usage: venn_gui.py <-f filename>
         """
@@ -46,7 +50,29 @@ class VennGUI(object):
                     self.load(new_file=False)
         self.root.mainloop()
 
+    def clear(self):
+        """ Empty the diagram, premises box and evaluation box """
+        self.premises_box.delete('1.0', tk.END)
+        self.msg_text.set("")
+        self.eval_box.delete(0, tk.END)
+        plt.clf()
+
+    def quit(self):
+        """ Quit the program """
+        if self.premises_box.edit_modified():
+            save_before_exit = tk.messagebox.askyesnocancel(
+                "Venn Diagram Interpreter", "Do you want to save the changes?")
+            if save_before_exit is None:
+                return
+            if save_before_exit:
+                self.save()
+        self.root.quit()
+
+    # ===============================================================================
+    #                            GUI preparation
+    # ===============================================================================
     def set_up(self):
+        """ Set up all GUI components """
         # Set up the venn
         self.collect = ExpressionSet()
 
@@ -148,9 +174,9 @@ class VennGUI(object):
         self.eval_box = tk.Entry(self.root)
         self.eval_box.grid(row=FIRST_ROW_OF_PREMISE_BOX + PREMISE_BOX_HEIGHT + 3,
                            column=0, sticky="ew")
-        self.eval_box.bind("<Return>", lambda e: self.update_diagram())
+        self.eval_box.bind("<Return>", lambda e: self.evaluate_exp())
 
-        eval_btn = tk.Button(self.root, text="Evaluate", command=self.update_diagram)
+        eval_btn = tk.Button(self.root, text="Evaluate", command=self.evaluate_exp)
         eval_btn.grid(row=FIRST_ROW_OF_PREMISE_BOX + PREMISE_BOX_HEIGHT + 3,
                       column=1)
         eval_btn.bind("<Return>", lambda e: eval_btn.invoke())
@@ -202,8 +228,12 @@ class VennGUI(object):
         self.root.config(menu=menubar)
         self.root.protocol("WM_DELETE_WINDOW", quit)
 
-    # Update button
+    # ===============================================================================
+    #                          Diagram display operations
+    # ===============================================================================
+    # "Show" button
     def show_diagram(self):
+        """ Displays the diagram with existing premises """
         plt.clf()
         self.msg_text.set("")
         # Create the ExpressionSet object
@@ -229,13 +259,13 @@ class VennGUI(object):
         if self.collect.empty() or len(self.collect) == 1:
             return
         self.collect.parse_premises()
-        self.collect.display_diagram(
-            highlight_some=bool(self.is_possible_highlight.get()))
+        self.collect.display_diagram(highlight_some=bool(self.is_possible_highlight.get()))
         self.fig.canvas.flush_events()
         self.fig.canvas.draw()
 
-    # Update button
-    def update_diagram(self):
+    # "Update" button
+    def evaluate_exp(self):
+        """ Evaluate an argument and displays the result """
         self.show_diagram()
         if self.collect.empty():
             self.msg_text.set("The diagram is empty!")
@@ -263,12 +293,15 @@ class VennGUI(object):
             self.msg_text.set(str(e))
             self.msg_label.configure(foreground="red")
 
-    # Load button
+    # ===============================================================================
+    #                         Local file operations
+    # ===============================================================================
     filetypes = (("Venn Diagram file (*.venn)", "*.venn"),
                  ("Normal text file (*.txt)", "*.txt"),
                  ("All types (*.*)", "*.*"))
 
     def load(self, new_file=True):
+        """ Load premises from local file """
         if new_file:
             self.filepath = tk.filedialog.askopenfilename(
                 defaultextension=".venn", filetypes=VennGUI.filetypes)
@@ -290,6 +323,7 @@ class VennGUI(object):
         self.root.title(self.filename + " - Venn Diagram Interpreter")
 
     def save_as(self, new_file=True):
+        """ Save premises to local file """
         if new_file or self.filepath == "" or self.filename == "":
             self.filepath = tk.filedialog.asksaveasfilename(
                 defaultextension=".venn", filetypes=VennGUI.filetypes)
@@ -303,17 +337,13 @@ class VennGUI(object):
         self.root.title(self.filename + " - Venn Diagram Interpreter")
 
     def save(self):
+        """ Save premises to current file """
         if self.filename == "":
             self.save_as()
         self.save_as(new_file=False)
 
-    def clear(self):
-        self.premises_box.delete('1.0', tk.END)
-        self.msg_text.set("")
-        self.eval_box.delete(0, tk.END)
-        plt.clf()
-
     def new_file(self):
+        """ Create a new file """
         if self.premises_box.edit_modified():
             save_before_new = tk.messagebox.askyesnocancel(
                 "Venn Diagram Interpreter", "Do you want to save the changes?")
@@ -326,16 +356,6 @@ class VennGUI(object):
         self.filename = ""
         self.filepath = ""
         self.root.title("Venn Diagram Interpreter")
-
-    def quit(self):
-        if self.premises_box.edit_modified():
-            save_before_exit = tk.messagebox.askyesnocancel(
-                "Venn Diagram Interpreter", "Do you want to save the changes?")
-            if save_before_exit is None:
-                return
-            if save_before_exit:
-                self.save()
-        self.root.quit()
 
 
 if __name__ == '__main__':

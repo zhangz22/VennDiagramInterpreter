@@ -19,10 +19,7 @@ class VennDiagramTestCase(unittest.TestCase):
             s.display_diagram()
         ret = s.evaluate(Expression(exp), show=show)
         if show:
-            plt.annotate(str(exp), xy=(0.5, 0.10), rotation=0, xytext=(0, 0),
-                     xycoords='figure fraction',
-                     size=14,
-                     ha='center', textcoords='offset points')
+            s.venn_diagram.show_argument(exp)
             plt.show()
         self.assertEqual((ret[0], ret[1]), expected)
 
