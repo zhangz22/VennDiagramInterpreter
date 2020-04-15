@@ -7,38 +7,14 @@ import matplotlib.pyplot as plt
 from matplotlib_venn import *
 
 
-def hex_to_rgba(hex):
-    hex = hex.lstrip('#')
-    hlen = len(hex)
-    rgb = [int(hex[i:i + hlen // 3], 16) / 255 for i in range(0, hlen, hlen // 3)]
-    return tuple(rgb + [0])
-
-
-venn = {
-    2: {
-        "venn": venn2,
-        "circles": venn2_circles,
-        "subsets": (1, 1, 0.5),
-        'colors':  list(map(hex_to_rgba, ["#ff7f7f", "#7fbf7f", "#d8ab7f"]))
-        },
-    3: {
-        "venn": venn3,
-        "circles": venn3_circles,
-        "subsets": (1, 1, 0.5, 1, 0.5, 0.5, 0.1),
-        "colors":  list(map(hex_to_rgba, ["#ff7f7f", "#7fbf7f", "#7f7fff", "#d8ab7f",
-                                          "#d87fd8", "#7fabd8", "#b298b2"]))
-    }
-}
-
-
 class ExpressionSet(object):
     def __init__(self):
         self.relations = set()  # A set of Expression objects
         self.members = set()  # A set of strings representing members (A,B,C...)
-        self.label_id = {}  # A set of all labels in the diagram (A,B,AB...)
-        self.crosses = {}  # A dictionary containing tuple of area code -> list of expressions that is emphasized by "Some" statements
+        self.all_label = {}  # A set of all labels in the diagram (A,B,AB...)
+        self.cross = {}  # A dictionary containing tuple of area code -> list of expressions that is emphasized by "Some" statements
         self.black = {}
-        self.venn_diagram = None  # The venn diagram objects
+        self.venn_diagram = VennDiagramPlt(self)
 
     def __contains__(self, key):
         """
@@ -82,8 +58,8 @@ class ExpressionSet(object):
         """
         if isinstance(exp, Expression):
             self.relations.add(exp)
-            self.members.add(exp.symbol1.name)
-            self.members.add(exp.symbol2.name)
+            self.members.add(exp.lhs.name)
+            self.members.add(exp.rhs.name)
         elif isinstance(exp, str):
             self.members.add(Token(exp).name)
         else:
@@ -123,25 +99,25 @@ class ExpressionSet(object):
         """
         support = set()
         against = set()
-        for area_label in self.label_id:
-            if exp.symbol1.name in area_label:
-                if exp.symbol1.some:
+        for area_label in self.all_label:
+            if exp.lhs.name in area_label:
+                if exp.lhs.some:
                     # Some A is B -> There must be an AB
-                    # Find the areas that contains symbol2 (e.g. AB)
-                    # The XOR operator here means if symbol2 is negated, find
-                    # the area that does not contain symbol2
-                    if exp.symbol2.neg ^ (exp.symbol2.name in area_label):
+                    # Find the areas that contains rhs (e.g. AB)
+                    # The XOR operator here means if rhs is negated, find
+                    # the area that does not contain rhs
+                    if exp.rhs.neg ^ (exp.rhs.name in area_label):
                         # Check for AB
                         support.add(area_label)
-                elif exp.symbol1.all:
+                elif exp.lhs.all:
                     # All A is B -> There must not be an A or B (only AB, B)
-                    # Find the areas that does not contain symbol2 (e.g. B)
-                    # The == operator here means if symbol2 is negated, find
-                    # the area that does contain symbol2
-                    if exp.symbol2.neg ^ (exp.symbol2.name not in area_label):
+                    # Find the areas that does not contain rhs (e.g. B)
+                    # The == operator here means if rhs is negated, find
+                    # the area that does contain rhs
+                    if exp.rhs.neg ^ (exp.rhs.name not in area_label):
                         # Check for A
                         against.add(area_label)
-                    elif exp.symbol2.neg ^ (exp.symbol2.name in area_label):
+                    elif exp.rhs.neg ^ (exp.rhs.name in area_label):
                         # Check for AB
                         support.add(area_label)
         return tuple(sorted(support)), against
@@ -155,13 +131,13 @@ class ExpressionSet(object):
         # Create venn diagram
         labels = tuple(sorted(self.members))
         if len(labels) == 2:
-            self.label_id = {labels[0]: "10",  # A (left)
-                             labels[1]: "01",  # B (right)
+            self.all_label = {labels[0]: "10",  # A (left)
+                              labels[1]: "01",  # B (right)
                              labels[0] + labels[1]: "11"}  # A ∩ B
         elif len(labels) == 3:
-            self.label_id = {labels[0]: '100',  # A (up-left)
-                             labels[1]: '010',  # B (up-right)
-                             labels[2]: '001',  # C (down)
+            self.all_label = {labels[0]: '100',  # A (up-left)
+                              labels[1]: '010',  # B (up-right)
+                              labels[2]: '001',  # C (down)
                              labels[0] + labels[1]: '110',  # A ∩ B
                              labels[0] + labels[2]: '101',  # A ∩ C
                              labels[1] + labels[2]: '011',  # B ∩ C
@@ -173,14 +149,14 @@ class ExpressionSet(object):
         # Parse relations
         for exp in self.relations:
             support, against = self.parse(exp)
-            if exp.symbol1.some:
+            if exp.lhs.some:
                 # At this time, in the tuple support (X,Y), then at least one of them
                 # should exist. We should mark an X between these two areas
                 # all_crosses is a dictionary { tuple of area labels -> expression }
-                if support not in self.crosses:
-                    self.crosses[support] = []
-                self.crosses[support].append(exp)
-            if exp.symbol1.all:
+                if support not in self.cross:
+                    self.cross[support] = []
+                self.cross[support].append(exp)
+            if exp.lhs.all:
                 # if support not in self.possible_all:
                 #     self.possible_all[support] = []
                 # self.possible_all[support].append(exp)
@@ -190,23 +166,16 @@ class ExpressionSet(object):
                         self.black[area_label] = []
                     self.black[area_label].append(exp)
 
-    def get_all_possible_area(self):
-        """
-        :return: a list of sets of area labels where each set represents that at
-                 least one of the area in the diagram is true
-        """
-        all_possible_combines = list(
-            map(lambda x: set(x) - self.black.keys(), self.crosses.keys()))
-        return all_possible_combines
-
-    def is_area_definite(self, target: set):
+    def is_area_definite(self, target: set, lhs: Token):
         """
         :param target: a large area being checked composed by small areas represented
                        by labels in the set
         :return: True if this area is sure to be TRUE
         """
-        # TODO Add symbol 1
-        all_possible_combines = self.get_all_possible_area()
+        all_possible_combines = set(self.cross.keys())
+        # For each cross in the diagram, remove the black part from it
+        all_possible_combines = list(map(lambda x: set(x) - self.black.keys(), all_possible_combines))
+        # If the target area covers            
         for area in all_possible_combines:
             if area.issubset(target):
                 return True
@@ -233,8 +202,8 @@ class ExpressionSet(object):
         :return: <if the expression could be TRUE>, <if the expression must be TRUE>, reason stated by a string
         """
         # Unknown set names
-        if exp.symbol1.name not in self.members or exp.symbol2.name not in self.members:
-            unknown = {exp.symbol1.name, exp.symbol2.name} - self.members
+        if exp.lhs.name not in self.members or exp.rhs.name not in self.members:
+            unknown = {exp.lhs.name, exp.rhs.name} - self.members
             return False, True, "Set name(s) not found: " + str(unknown).strip("{").strip("}")
 
         # Get area code results for the expression being validated
@@ -243,13 +212,13 @@ class ExpressionSet(object):
         valid_against_area = against - set(self.black.keys())
 
         # Conclusion
-        if exp.symbol1.some:
+        if exp.lhs.some:
             # Definitely true -> support should cover an X
             # Possibly true -> support covers part of an X / support are all unknown
             # Definitely false -> support are all black
             if len(valid_support_area) == 0:
                 result = "NO TRUE"
-            elif self.is_area_definite(valid_support_area):
+            elif self.is_area_definite(valid_support_area, exp.lhs):
                 result = "TRUE"
             else:
                 result = "MAYBE TRUE"
@@ -257,11 +226,12 @@ class ExpressionSet(object):
             # Definitely false -> at least one of against is not black
             # Possibly false -> again covers part of an X / support are all unknown
             # Definitely true -> has valid support area
-            ## TODO add symbol1 to definite
-            if len(valid_support_area) > 0: # TODO add is_area_definite
+            if self.is_area_definite(valid_support_area, exp.lhs):
                 result = "TRUE"
-            elif self.is_area_definite(valid_against_area):
+            elif self.is_area_definite(valid_against_area, exp.lhs):
                 result = "FALSE"
+            elif not self.is_area_definite(valid_support_area, exp.lhs):
+                result = "MAYBE TRUE"
             else:
                 result = "MAYBE FALSE"
 
@@ -272,15 +242,46 @@ class ExpressionSet(object):
                 marked = set(valid_support_area)
             else:
                 marked = against
-            self.mark_area(marked, color=ExpressionSet.results[result]["color"], pattern=ExpressionSet.results[result]["pattern"])
-            self.show_validatity(ExpressionSet.results[result]["validity"] and ExpressionSet.results[result]["must"])
+            self.venn_diagram.mark_area(marked,
+                                        color=ExpressionSet.results[result]["color"],
+                                        pattern=ExpressionSet.results[result]["pattern"])
+            self.venn_diagram.show_validatity(ExpressionSet.results[result]["validity"] and ExpressionSet.results[result]["must"])
 
         return ExpressionSet.results[result]["validity"], ExpressionSet.results[result]["must"], ExpressionSet.results[result]["reason"]
 
+    def display_diagram(self, highlight_some=True):
+        self.venn_diagram.display_diagram(highlight_some)
 
-    # ===============================================================================
-    # VISUALIZATION RELATED FUNCTIONS
-    # ===============================================================================
+
+def hex_to_rgba(hex_):
+    hex_ = hex_.lstrip('#')
+    hlen = len(hex_)
+    rgb = [int(hex_[i:i + hlen // 3], 16) / 255 for i in range(0, hlen, hlen // 3)]
+    return tuple(rgb + [0])
+
+
+class VennDiagramPlt(object):
+    venn = {
+        2: {
+            "venn": venn2,
+            "circles": venn2_circles,
+            "subsets": (1, 1, 0.5),
+            'colors': list(map(hex_to_rgba, ["#ff7f7f", "#7fbf7f", "#d8ab7f"]))
+        },
+        3: {
+            "venn": venn3,
+            "circles": venn3_circles,
+            "subsets": (1, 1, 0.5, 1, 0.5, 0.5, 0.1),
+            "colors": list(
+                map(hex_to_rgba, ["#ff7f7f", "#7fbf7f", "#7f7fff", "#d8ab7f",
+                                  "#d87fd8", "#7fabd8", "#b298b2"]))
+        }
+    }
+
+    def __init__(self, parent: ExpressionSet):
+        self.expression_set = parent
+        self.venn_diagram = None  # The venn diagram objects
+
     def display_diagram(self, highlight_some=True):
         """
         This function displays the diagram according to the area codes generated by
@@ -288,35 +289,35 @@ class ExpressionSet(object):
         :param highlight_some: a flag to determine whether to highlight "Some"
                                premises using a background color
         """
-        if len(self.label_id) == 0 and len(self.members) != 0:
+        if len(self.expression_set.all_label) == 0 and len(self.expression_set.members) != 0:
             print("ERROR: need to parse the expressions first", file=sys.stderr)
-            self.parse_premises()
+            self.expression_set.parse_premises()
 
         # Create venn diagram basic structure
-        labels = tuple(sorted(self.members))
+        labels = tuple(sorted(self.expression_set.members))
         if not 2 <= len(labels) <= 3:
             raise ValueError("ERROR: Currently only at two or three items can be "
                              "supported but got " + str(labels))
-        colors = dict(zip(self.label_id.keys(), venn[len(self)]["colors"]))
+        colors = dict(zip(self.expression_set.all_label.keys(), VennDiagramPlt.venn[len(self.expression_set)]["colors"]))
 
         # Draw the venn diagram in matplotlib
         plt.ion()
-        c = venn[len(self)]["circles"](subsets=venn[len(self)]["subsets"])  # Edge
-        self.venn_diagram = venn[len(self)]["venn"](subsets=venn[len(self)]["subsets"], set_labels=labels)
-        for area_label, color in zip(self.label_id, colors):  # Set areas to white
-            self.venn_diagram.get_patch_by_id(self.label_id[area_label]).set_alpha(1.0)
+        c = VennDiagramPlt.venn[len(self.expression_set)]["circles"](subsets=VennDiagramPlt.venn[len(self.expression_set)]["subsets"])  # Edge
+        self.venn_diagram = VennDiagramPlt.venn[len(self.expression_set)]["venn"](subsets=VennDiagramPlt.venn[len(self.expression_set)]["subsets"], set_labels=labels)
+        for area_label, color in zip(self.expression_set.all_label, colors):  # Set areas to white
+            self.venn_diagram.get_patch_by_id(self.expression_set.all_label[area_label]).set_alpha(1.0)
             self.venn_diagram.get_patch_by_id(
-                self.label_id[area_label]).set_facecolor("white")
+                self.expression_set.all_label[area_label]).set_facecolor("white")
             self.venn_diagram.get_patch_by_id(
-                self.label_id[area_label]).set_edgecolor((0, 0, 0, 0))
-            self.venn_diagram.get_label_by_id(self.label_id[area_label]).set_text("")
+                self.expression_set.all_label[area_label]).set_edgecolor((0, 0, 0, 0))
+            self.venn_diagram.get_label_by_id(self.expression_set.all_label[area_label]).set_text("")
 
         # Areas
         area_colors, texts = [], []
 
         def color_area(area_label: str):
             for exp in exps:
-                area = self.venn_diagram.get_patch_by_id(self.label_id[area_label])
+                area = self.venn_diagram.get_patch_by_id(self.expression_set.all_label[area_label])
                 area.set_alpha(1.0)
                 area.set_facecolor(colors[area_label])
                 area_colors.append(area)
@@ -324,12 +325,12 @@ class ExpressionSet(object):
 
         # Hightlight "All" premises using a background color
         # if highlight_all:
-        #     for area_label_tuple, exps in self.possible_all.items():
+        #     for area_label_tuple, exps in self.expression_set.possible_all.items():
         #         for area_label in area_label_tuple:
         #             color_area(area_label)
 
         # Hightlight "Some" premises using a background color
-        for area_label_pair, exps in self.crosses.items():
+        for area_label_pair, exps in self.expression_set.cross.items():
             if len(area_label_pair) == 2:
                 self.mark_intersect(area_label_pair)
             if highlight_some:
@@ -337,9 +338,9 @@ class ExpressionSet(object):
                     color_area(area_label)
 
         # Disabled areas should be marked black
-        for area_label, exps in self.black.items():
+        for area_label, exps in self.expression_set.black.items():
             for exp in exps:
-                area = self.venn_diagram.get_patch_by_id(self.label_id[area_label])
+                area = self.venn_diagram.get_patch_by_id(self.expression_set.all_label[area_label])
                 area.set_alpha(1.0)
                 area.set_facecolor('black')
                 area_colors.append(area)
@@ -356,7 +357,7 @@ class ExpressionSet(object):
         :return: the position or rotation of a "X" symbol between these two areas on
                  the diagram
         """
-        labels = tuple(sorted(self.members))
+        labels = tuple(sorted(self.expression_set.members))
         get_center_pos = lambda id1, id2: \
             (np.array(self.venn_diagram.get_label_by_id(id1).get_position()) +
              np.array(self.venn_diagram.get_label_by_id(id2).get_position())) / 2
@@ -427,8 +428,8 @@ class ExpressionSet(object):
                 pos[1] *= 1.4
                 rot = 55
                 return pos, rot
-        return get_center_pos(self.label_id[areas[0]],
-                              self.label_id[areas[1]]), 0
+        return get_center_pos(self.expression_set.all_label[areas[0]],
+                              self.expression_set.all_label[areas[1]]), 0
 
     def mark_intersect(self, area_labels: tuple):
         """
@@ -441,7 +442,7 @@ class ExpressionSet(object):
             for j in range(i + 1, len(area_labels)):
                 pos, rot = self.get_intersect_pos(
                     (area_labels[i], area_labels[j]))
-                size = (5 - len(self.members)) * 7
+                size = (5 - len(self.expression_set.members)) * 7
                 plt.annotate('X', xy=pos, rotation=rot, xytext=(0, 0),
                              weight='bold',
                              size=size,
@@ -461,11 +462,11 @@ class ExpressionSet(object):
         """
         for area_label in area:
             self.venn_diagram.get_patch_by_id(
-                self.label_id[area_label]).set_edgecolor(color)
+                self.expression_set.all_label[area_label]).set_edgecolor(color)
             self.venn_diagram.get_patch_by_id(
-                self.label_id[area_label]).set_linewidth(2)
+                self.expression_set.all_label[area_label]).set_linewidth(2)
             self.venn_diagram.get_patch_by_id(
-                self.label_id[area_label]).set_hatch(pattern)
+                self.expression_set.all_label[area_label]).set_hatch(pattern)
 
     def show_validatity(self, is_valid: bool):
         if is_valid:
@@ -478,4 +479,3 @@ class ExpressionSet(object):
                      xycoords='figure fraction',
                      size=25,
                      ha='center', textcoords='offset points')
-

@@ -62,7 +62,7 @@ class Token(object):
 class Expression(object):
     def __init__(self, expression: str):
         try:
-            self.symbol1, self.symbol2 = Expression.parse(expression)
+            self.lhs, self.rhs = Expression.parse(expression)
         except SyntaxError as e:
             raise e
         self.to_string = expression
@@ -83,21 +83,21 @@ class Expression(object):
         else:
             raise SyntaxError("Invalid expression \"" + exp + "\": no relation found.")
 
-        symbol1, symbol2 = Token(exp_list[0:aux]), Token(exp_list[aux+1:])
-        if symbol1.neg or symbol2.all or symbol2.some:
+        lhs, rhs = Token(exp_list[0:aux]), Token(exp_list[aux+1:])
+        if lhs.neg or rhs.all or rhs.some:
             raise SyntaxError("Invalid expression \"" + exp + "\"")
-        if symbol1.name == symbol2.name:
-            raise SyntaxError("Invalid expression with identical set name \"{}\"".format(symbol1))
-        return symbol1, symbol2
+        if lhs.name == rhs.name:
+            raise SyntaxError("Invalid expression with identical set name \"{}\"".format(lhs))
+        return lhs, rhs
 
     def __str__(self):
-        return str(self.symbol1) + "'s are " + str(self.symbol2) + "'s"
+        return str(self.lhs) + "'s are " + str(self.rhs) + "'s"
 
     def __contains__(self, key):
         if isinstance(key, str):
-            return key == self.symbol1.name or key == self.symbol2.name
+            return key == self.lhs.name or key == self.rhs.name
         elif isinstance(key, Token):
-            return key == self.symbol1 or key == self.symbol2
+            return key == self.lhs or key == self.rhs
         else:
             return False
 
@@ -106,11 +106,11 @@ class Expression(object):
             return True
         if not isinstance(other, Expression):
             return False
-        return self.symbol1 == other.symbol1 and self.symbol2 == other.symbol2
+        return self.lhs == other.lhs and self.rhs == other.rhs
 
     def __hash__(self):
         prime = 31
         result = 1
-        result = prime * result + hash(self.symbol1)
-        result = prime * result + hash(self.symbol2)
+        result = prime * result + hash(self.lhs)
+        result = prime * result + hash(self.rhs)
         return result
