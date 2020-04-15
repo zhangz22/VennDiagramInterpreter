@@ -34,19 +34,19 @@ class VennDiagramTestCase(unittest.TestCase):
         premises = """All A's are B's\n
                       All B's are C's"""
         exp = "All A's are C's"
-        self.simple_test(premises, exp, TRUE, show=True)
+        self.simple_test(premises, exp, TRUE, show=False)
 
     def test_all_all_not(self):
         premises = """All A's are B's\n
                       All B's are C's"""
         exp = "All A's are not C's"
-        self.simple_test(premises, exp, FALSE, show=True)
+        self.simple_test(premises, exp, FALSE, show=False)
 
     def test_all_all_not_2(self):
         premises = """All A's are B's\n
                       All B's are C's"""
         exp = "All C's are not A's"
-        self.simple_test(premises, exp, MAYBE_TRUE, show=True)
+        self.simple_test(premises, exp, MAYBE_TRUE, show=False)
 
     def test_all_some(self):
         premises = """All A's are B's\n
@@ -55,11 +55,29 @@ class VennDiagramTestCase(unittest.TestCase):
         self.simple_test(premises, exp, MAYBE_TRUE)
 
     def test_all_some_2(self):
-        ### TODO change the color of X
         premises = """All A's are B's\n
                       Some C's are A's"""
         exp = "Some C's are B's"
-        self.simple_test(premises, exp, TRUE)
+        self.simple_test(premises, exp, TRUE, show=True)
+
+    def test_cross(self):
+        premises = """All B's are A's\n
+                      Some C's are B's"""
+        exp = "Some C's are A's"
+        self.simple_test(premises, exp, TRUE, show=True)
+
+    def test_cross2(self):
+        premises = """All A's are C's\n
+                      Some A's are B's"""
+        exp = "Some C's are A's"
+        self.simple_test(premises, exp, TRUE, show=True)
+
+    def test_double_cross(self):
+        premises = """All A's are B's\n
+                      Some B's are C's\n
+                      Some A's are C's"""
+        exp = "Some A's are C's"
+        self.simple_test(premises, exp, TRUE, show=True)
 
 
 if __name__ == '__main__':

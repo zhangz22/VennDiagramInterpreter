@@ -6,7 +6,6 @@ from matplotlib_venn import *
 
 import expression_set
 
-
 def hex_to_rgba(hex_):
     hex_ = hex_.lstrip('#')
     hlen = len(hex_)
@@ -205,13 +204,27 @@ class VennDiagramPlt(object):
             return
         for i in range(len(area_labels)):
             for j in range(i + 1, len(area_labels)):
-                pos, rot = self.get_intersect_pos(
-                    (area_labels[i], area_labels[j]))
+                pos, rot = self.get_intersect_pos((area_labels[i], area_labels[j]))
                 size = (5 - len(self.expression_set.members)) * 7
-                plt.annotate('X', xy=pos, rotation=rot, xytext=(0, 0),
-                             weight='bold',
-                             size=size,
-                             ha='center', textcoords='offset points')
+                # If one of the area is black, move the cross
+                if area_labels[i] in self.expression_set.black:
+                    color = (1, 1, 0, 0.75)
+                    pos2, rot2 = self.get_intersect_pos((area_labels[j], area_labels[j]))
+                elif area_labels[j] in self.expression_set.black:
+                    color = (1, 1, 0, 0.75)
+                    pos2, rot2 = self.get_intersect_pos((area_labels[i], area_labels[i]))
+                else:
+                    color = "black"
+                    pos2 = None
+                if pos2 is not None:
+                    plt.arrow(*(np.array(pos)+[0,0.03]), *((np.array(pos2)-np.array(pos))*0.5), head_width=0.02)
+                    plt.annotate('X', xy=pos2, rotation=rot2, xytext=(0, 0),
+                                 weight='bold', size=size, ha='center',
+                                 textcoords='offset points')
+                # Draw the cross on the diagram
+                plt.annotate('X', xy=pos, rotation=rot, xytext=(0, 0), weight='bold',
+                             size=size, color=color, ha='center',
+                             textcoords='offset points')
 
     def mark_area(self, area: set, color="red", pattern='xxx'):
         """

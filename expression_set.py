@@ -1,6 +1,4 @@
 from expression import Expression, Token
-import venn_diagram
-
 
 results = {
     "TRUE": {"validity": True, "must": True, "color": "green", "pattern": "///",
@@ -46,6 +44,7 @@ class ExpressionSet(object):
         # {A -> All A's are B's,  AC -> All A's are B's... }
         self.black = dict()
         # The venn diagram plot
+        import venn_diagram
         self.venn_diagram = venn_diagram.VennDiagramPlt(self)
 
     def __contains__(self, key):
