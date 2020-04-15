@@ -259,7 +259,7 @@ class VennDiagramPlt(object):
             color = hex_to_rgba("#8B0000")
         plt.annotate(text, xy=(0.5, 0.02), rotation=0, xytext=(0, 0),
                      xycoords='figure fraction',
-                     size=25,
+                     size=22,
                      ha='center', textcoords='offset points')
 
     def show_argument(self, exp):
@@ -267,7 +267,7 @@ class VennDiagramPlt(object):
         This function displays the expression being validated on the diagram
         :param exp: the argument being validated
         """
-        plt.annotate(str(exp), xy=(0.5, 0.10), rotation=0, xytext=(0, 0),
+        plt.annotate(str(exp), xy=(0.5, 0.08), rotation=0, xytext=(0, 0),
                      xycoords='figure fraction',
-                     size=14,
+                     size=13,
                      ha='center', textcoords='offset points')

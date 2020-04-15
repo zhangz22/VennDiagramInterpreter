@@ -24,6 +24,7 @@ class VennGUI(object):
         self.show_btn = None
         self.is_definite_highlight = None
         self.is_possible_highlight = None
+        self.show_exp_in_diagram = None
         self.eval_box = None
         self.set_up()
 
@@ -162,6 +163,13 @@ class VennGUI(object):
         #                            variable=self.is_definite_highlight)
         # def_check.grid(row=FIRST_ROW_OF_PREMISE_BOX + PREMISE_BOX_HEIGHT + 1,
         #                column=0)
+        self.show_exp_in_diagram = tk.IntVar()
+        show_exp_check = tk.Checkbutton(self.root,
+                                   text="Display the argument in the diagram",
+                                   variable=self.show_exp_in_diagram)
+        show_exp_check.grid(row=FIRST_ROW_OF_PREMISE_BOX + PREMISE_BOX_HEIGHT + 1,
+                       column=0)
+        show_exp_check.toggle()
 
         # Input box
         tk.Label(self.root, text="Enter the expression you want to evaluate:").grid(
@@ -279,7 +287,7 @@ class VennGUI(object):
             return
         try:
             ret, must, reason = self.collect.evaluate(
-                Expression(self.eval_box.get()), show=True)
+                Expression(self.eval_box.get()), show=True, show_exp=self.show_exp_in_diagram.get())
             self.msg_text.set(reason)
             if ret:
                 if must:

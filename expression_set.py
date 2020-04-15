@@ -244,11 +244,13 @@ class ExpressionSet(object):
                 return True
         return False
 
-    def evaluate(self, exp: Expression, show=False):
+    def evaluate(self, exp: Expression, show=False, show_exp=True):
         """
         This function evaluates the validity of an argument
         :param exp: the expression being validated
         :param show: if the result should be displayed on the diagram
+        :param show_exp: if the argument should be displayed on the diagram
+                         Only when show==True will this be effective
         :return: <if the expression could be TRUE>, <if the expression must be TRUE>,
                 reason stated by a string
         """
@@ -297,7 +299,8 @@ class ExpressionSet(object):
                                         color=results[result]["color"],
                                         pattern=results[result]["pattern"])
             self.venn_diagram.show_validatity(results[result]["validity"] and results[result]["must"])
-            self.venn_diagram.show_argument(exp)
+            if show_exp:
+                self.venn_diagram.show_argument(exp)
 
         return results[result]["validity"], results[result]["must"], results[result]["reason"]
 
