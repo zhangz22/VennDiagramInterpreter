@@ -42,7 +42,7 @@ The logic argument could be:
 
 Each element is separated by newline characters.
 
-### Example
+### Examples
 ```
 cat example/example1.venn
 ```
@@ -51,7 +51,9 @@ B <br>
 Some A's are B's <br>
 Some B's are C's <br>
 C <br>
-```python venn_gui.py -f example/example1.venn --eval "Some A's are C's"```
+```
+python venn_gui.py -f example/example1.venn --eval "Some A's are C's"
+```
 ![exampl1](example/example1.png)
 <br>
 <br>
@@ -60,5 +62,7 @@ cat example/example1.venn
 ```
 All A's are B's <br>
 All B's are C's <br>
-```python venn_gui.py -f example/example2.venn --eval "All A's are C's"```
+```
+python venn_gui.py -f example/example2.venn --eval "All A's are C's" --no_window
+```
 ![exampl1](example/example2_no_window.png)
