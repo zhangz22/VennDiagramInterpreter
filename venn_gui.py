@@ -23,7 +23,6 @@ class VennGUI(object):
         self.msg_label = None
         self.premises_box = None
         self.show_btn = None
-        self.is_definite_highlight = None
         self.is_possible_highlight = None
         self.show_exp_in_diagram = None
         self.eval_box = None
@@ -159,12 +158,6 @@ class VennGUI(object):
                        sticky=tk.W + tk.E, rowspan=1)
         clear_btn.bind("<Return>", lambda e: clear_btn.invoke())
 
-        # load_btn = tk.Button(self.root, text="Load", command=load)
-        # load_btn.grid(row=3, column=1)
-        #
-        # save_btn = tk.Button(self.root, text="Save", command=save_as)
-        # save_btn.grid(row=4, column=1)
-
         self.is_possible_highlight = tk.IntVar()
         poss_check = tk.Checkbutton(self.root,
                                     text="Use color shadow to highlight \"Some\" statements.",
@@ -173,12 +166,6 @@ class VennGUI(object):
                         column=0)
         poss_check.toggle()
 
-        # self.is_definite_highlight = tk.IntVar()
-        # def_check = tk.Checkbutton(self.root,
-        #                            text="Use color shadow to highlight \"All\" statements.",
-        #                            variable=self.is_definite_highlight)
-        # def_check.grid(row=FIRST_ROW_OF_PREMISE_BOX + PREMISE_BOX_HEIGHT + 1,
-        #                column=0)
         self.show_exp_in_diagram = tk.IntVar()
         show_exp_check = tk.Checkbutton(self.root,
                                    text="Display the argument in the diagram",
