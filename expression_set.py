@@ -257,7 +257,8 @@ class ExpressionSet(object):
             # Definitely false -> at least one of against is not black
             # Possibly false -> again covers part of an X / support are all unknown
             # Definitely true -> has valid support area
-            if len(valid_support_area) > 0:
+            ## TODO add symbol1 to definite
+            if len(valid_support_area) > 0: # TODO add is_area_definite
                 result = "TRUE"
             elif self.is_area_definite(valid_against_area):
                 result = "FALSE"
@@ -356,13 +357,9 @@ class ExpressionSet(object):
                  the diagram
         """
         labels = tuple(sorted(self.members))
-        get_center_pos = lambda id1, id2: (
-                                                  np.array(
-                                                      self.venn_diagram.get_label_by_id(
-                                                          id1).get_position()) +
-                                                  np.array(
-                                                      self.venn_diagram.get_label_by_id(
-                                                          id2).get_position())) / 2
+        get_center_pos = lambda id1, id2: \
+            (np.array(self.venn_diagram.get_label_by_id(id1).get_position()) +
+             np.array(self.venn_diagram.get_label_by_id(id2).get_position())) / 2
         if len(labels) == 2:
             A, B = labels[0], labels[1]
             if areas == (A, A + B) or areas == (A + B, A):
