@@ -86,12 +86,6 @@ class VennDiagramPlt(object):
                 area_colors.append(area)
                 texts.append(str(exp))
 
-        # Hightlight "All" premises using a background color
-        # if highlight_all:
-        #     for area_label_tuple, exps in self.expression_set.possible_all.items():
-        #         for area_label in area_label_tuple:
-        #             color_area(area_label)
-
         # Hightlight "Some" premises using a background color
         for area_label_pair, exps in self.expression_set.cross.items():
             if len(area_label_pair) == 2:
@@ -109,11 +103,6 @@ class VennDiagramPlt(object):
                 area.set_facecolor('black')
                 area_colors.append(area)
                 texts.append(str(exp))
-
-        # Display the legend
-        # self.fig.legend(handles=area_colors, labels=texts) #,
-        # loc='center left',
-        # bbox_to_anchor=(1, 0.5))
 
     def get_intersect_pos(self, areas: tuple):
         """
