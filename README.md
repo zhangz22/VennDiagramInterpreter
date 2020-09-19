@@ -1,7 +1,7 @@
 # VennDiagramInterpreter
 ### Overview
-This is my undergraduate thesis. A simple program to validate some logic argument using
-the venn diagram
+This is my undergraduate project. A simple program to parse, interpret, validate and visualize logic arguments using
+Venn diagram
 
 ### Environment installation
 ```
@@ -43,7 +43,7 @@ The file should contains all premises in logic arguments.
 
 ### Syntax
 The logic argument could be:
-- Set (total 3 at most): The name of the set, use a quote("") if it contains multiple words
+- Set (total 3 at most): The name of the set, use a quote("") if it contains multiple words or spaces
 - Expression: <All/Some> A's are <(not)> B's
   <br> if the set name in the expression is not specified elsewhere, it will be added 
   automatically
@@ -62,15 +62,15 @@ C <br>
 ```
 python venn_gui.py -f example/example1.venn --eval "Some A's are C's"
 ```
-![exampl1](example/example1.png)
+![example1](example/example1.png)
 <br>
 <br>
 ```
-cat example/example1.venn
+cat example/example2.venn
 ```
 All A's are B's <br>
 All B's are C's <br>
 ```
 python venn_gui.py -f example/example2.venn --eval "All A's are C's" --no_window
 ```
-![exampl2](example/example2_no_window.png)
+![example2](example/example2_no_window.png)
